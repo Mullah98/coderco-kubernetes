@@ -45,27 +45,30 @@
     - Managed by K8s for scaling and orchastration
 
 
+```
+                                    ┌────────────────────────┐
+                                    │       Control Plane    │
+                                    │------------------------│
+                                    │  API Server            │
+                                    │  Scheduler             │
+                                    │  Controller Manager    │
+                                    │  etcd (data store)     │
+                                    └─────────┬──────────────┘
+                                              │
+                            ┌─────────────────┴─────────────┐
+                            │                               │
+                        ┌─────────┐                     ┌─────────┐
+                        │Worker   |                     | Worker  |
+                        |Node 1   │                     │  Node 2 │
+                        │---------│                     │---------│
+                        │ Kubelet │                     │ Kubelet │
+                        │ Kube-   │                     │ Kube-   │
+                        │ proxy   │                     │ proxy   │
+                        │ Runtime │                     │ Runtime │
+                        │ Pods    │                     │ Pods    │
+                        └─────────┘                     └─────────┘
+```
 
-            ┌────────────────────────┐
-            │       Control Plane    │
-            │------------------------│
-            │  API Server            │
-            │  Scheduler             │
-            │  Controller Manager    │
-            │  etcd (data store)     │
-            └─────────┬──────────────┘
-                      │
-      ┌───────────────┴───────────────┐
-      │                               │
-  ┌─────────┐                     ┌─────────┐
-  │  Node 1 │                     │  Node 2 │
-  │---------│                     │---------│
-  │ Kubelet │                     │ Kubelet │
-  │ Kube-   │                     │ Kube-   │
-  │ proxy   │                     │ proxy   │
-  │ Runtime │                     │ Runtime │
-  │ Pods    │                     │ Pods    │
-  └─────────┘                     └─────────┘
 Control Plane: the brain, decides what happens.
 
 Nodes: the workers, actually run your applications in pods.
