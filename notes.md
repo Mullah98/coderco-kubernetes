@@ -46,186 +46,207 @@
 
 
 ```
-                                    ┌────────────────────────┐
-                                    │       Control Plane    │
-                                    │------------------------│
-                                    │  API Server            │
-                                    │  Scheduler             │
-                                    │  Controller Manager    │
-                                    │  etcd (data store)     │
-                                    └─────────┬──────────────┘
-                                              │
-                            ┌─────────────────┴─────────────┐
-                            │                               │
-                        ┌─────────┐                     ┌─────────┐
-                        │Worker   |                     | Worker  |
-                        |Node 1   │                     │  Node 2 │
-                        │---------│                     │---------│
-                        │ Kubelet │                     │ Kubelet │
-                        │ Kube-   │                     │ Kube-   │
-                        │ proxy   │                     │ proxy   │
-                        │ Runtime │                     │ Runtime │
-                        │ Pods    │                     │ Pods    │
-                        └─────────┘                     └─────────┘
+                               ┌────────────────────────┐
+                               │      Control Plane     │
+                               │------------------------│
+                               │  API Server            │
+                               │  Scheduler             │
+                               │  Controller Manager    │
+                               │  etcd (data store)     │
+                               └─────────┬──────────────┘
+                                         │
+                           ┌─────────────┴─────────────┐
+                           │                           │
+                       ┌─────────┐                 ┌─────────┐
+                       │ Worker  │                 │ Worker  │
+                       │ Node 1  │                 │ Node 2  │
+                       │---------│                 │---------│
+                       │ Kubelet │                 │ Kubelet │
+                       │ Kube-   │                 │ Kube-   │
+                       │ proxy   │                 │ proxy   │
+                       │ Runtime │                 │ Runtime │
+                       │---------│                 │---------│
+                       │ Pods    │                 │ Pods    │
+                       │ - nginx │                 │ - nginx │
+                       │ - api   │                 │ - api   │
+                       └─────────┘                 └─────────┘
 ```
 
-Control Plane: the brain, decides what happens.
-
-Nodes: the workers, actually run your applications in pods.
-
-Kubelet: talks to control plane to run pods.
-
-Kube-proxy: handles network communication.
+- **Control Plane:** the brain, decides what happens.
+- **Nodes:** the workers, actually run your applications in pods.
+- **Kubelet:** talks to control plane to run pods.
+- **Kube-proxy:** handles network communication.
 
 ---
 
-## Creating a local Cluster
-1. **Installation**
-```
+Here’s a clean, compact one-page cheat sheet from your notes:
+
+---
+
+## KIND setup
+
+**1. Local Cluster Setup**
+
+**Install KIND & kubectl (Ubuntu):**
+```bash
 curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
 chmod +x kind
-sudomv kind /usr/local/bin/
+sudo mv kind /usr/local/bin/
 
-# kubectl
 sudo snap install kubectl --classic
 ```
 
-2. **Have Docker Desktop running**
+**Docker must be running** before KIND.
 
-3. **Create KIND cluster**
-```
-# Config file: conf.yaml
+**Create KIND cluster:**
+`conf.yaml` example:
+
+```yaml
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
   - role: control-plane
   - role: worker
   - role: worker
+```
 
-# Create cluster
+```bash
 kind create cluster --name k8s-demo --config conf.yaml
 ```
 
-4. **Verify cluster**
-```
+**Verify cluster:**
+```bash
 kubectl cluster-info
 kubectl config use-context kind-k8s-demo
 kubectl get nodes
 ```
 
-5. **Work with pods**
-- `kubectl rung nginx --image=nginx` -> Run nginx pod
-- `kubectl get pods -w` -> Watch pod status
-- `kubectl get pods -o wide` -> Shows which Node a pod is on
-- `kubectl describe pod nginx` -> Check pod details
-
-6. **Deployments**
+**Delete cluster:**
+```bash
+kind delete cluster --name k8s-demo
 ```
-kubectl create deployment nginx --image=nginx
-kubectl get deployments
-kubectl get pods
-kubectl scale deployment nginx --replicas=3
-```
-
-7. **Delete cluster**
-`kind delete cluster --name k8s-demo`
 
 ---
 
-## Pods & YAML
-- Pod is the smallest deployable unit in K8s
-- Wraps *one or more* containers
-- Containers in a pod are always scheduled together
+**2. Pods**
+- Smallest deployable unit; can contain multiple containers.
+- Containers share **network namespace** (localhost) and must mount volumes explicitly.
 
-**Pod Networking & Storage**
-- Containers share the *same IP and port space*
-- Communicate via the localhost
-- Storage is *not* automatic; volumes must be explicitly mounted
+**Imperative pod:**
 
-**K8s YAML***
-- Requires 4 top level fields:
-    1. **apiVersion** - K8s api version
-    2. **kind** - Type of object (pod, service etc)
-    3. **metadata** - Name, labels, annotations, namespace
-    4. **spec** - Desired state (containers, images, volumes etc)
-
-- `containers` is a list because pods can run multiple containers
-- Image defaults to `latest` if no tag is specified
-
-
-**Creating Pods declaratively**
+```bash
+kubectl run nginx --image=nginx
+kubectl get pods -w
+kubectl describe pod nginx
+kubectl get pods -o wide   # shows node placement
 ```
-apiVersion:v1
+
+**Declarative pod YAML:**
+```yaml
+apiVersion: v1
 kind: Pod
 metadata:
-    name: nginx-pod
-    labels:
-      app:nginx
+  name: nginx-pod
+  labels:
+    app: nginx
 spec:
- containers:
-  - name: nginx-container
-    image: nginx
-    ports:
-       - containerPort:80
-
+  containers:
+    - name: nginx-container
+      image: nginx
+      ports:
+        - containerPort: 80
 ```
 
-**Creating Pods imperatively**
-- `kubectl run nginx-imperative --image=nginx`
+```bash
+kubectl apply -f nginx-pod.yaml
+```
 
 ---
 
-## K8s Deployments
-- K8s controller managing *multiple pods*
-- Ensures desired number of pods are always running
-- Handles scaling, updates, and rollbacks
-- Simplifies large-scale ops, automates pod creation and management, and supports scaling up/down without manual intervention
+## **Deployments**
+- Controller managing multiple pods: scaling, updates, rollbacks.
+- Top-level `metadata` → Deployment info; `spec.template` → pod blueprint.
 
-**Rolling update** - upgrade pods without downtime
-**Rollbacks** - revert to previous version if an update fails
-
-**K8s Deployment yaml**
-- Structure:
-    - **apiVersion**: `apps/v1` for deployments
-    - **kind**: `Deployment`
-    - **metadata**: Name, labels, namespace
-    - **spec**:
-        - **replicas**: Number of pods to maintain
-        - **selector**: Matches deployment to pods via labels
-        - **template**: Pod blueprint (nested pod spec)
-            - Contains **metadata** (labels) and **spec** (containers, images, volumes)
-
-- `kubectl apply -f <deployment.yaml>` creates or updates the deployment
-- Deployment creates a **replica set**
-- Replica set ensures the correct number of pods are running
-- Pods are named based on deployment + unique identifiers
-
----
-
-**Creating Deployments declaratively**
+**Imperative deployment:**
+```bash
+kubectl create deployment nginx-deployment --image=nginx --replicas=3
+kubectl get deployments
+kubectl get pods
+kubectl scale deployment nginx-deployment --replicas=5
 ```
-apiVersion:apps/v1
+
+**Declarative deployment YAML:**
+```yaml
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nginx-deployment
   labels:
     app: nginx
 spec:
-    replicas:3
-    selector:
-     matchLabels:
+  replicas: 3
+  selector:
+    matchLabels:
       app: nginx
-    template:
-     metadata:
-        labels:
-          app:nginx
-     spec:
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
       containers:
-       - name: nginx
-         image: nginx:latest
-         ports:
-           - containerPort: 80
+        - name: nginx
+          image: nginx:latest
+          ports:
+            - containerPort: 80
 ```
 
-**Creating Deployments imperatively**
-- `kubectl create deployment nginx-deployment --image=nginx --replicas=3`
+```bash
+kubectl apply -f nginx-deployment.yaml
+```
+
+**Tips:**
+- `kubectl get pods -o wide` → see node placement.
+- Deleting a Deployment removes all its pods.
+- `spec.selector` must match `spec.template.metadata.labels`.
+
+---
+
+## ReplicaSets vs Deployments
+| Feature / Concept       | ReplicaSet                                             | Deployment                                                       |
+| ----------------------- | ------------------------------------------------------ | ---------------------------------------------------------------- |
+| **Primary Role**        | Ensures a specific number of pod instances are running | Manages ReplicaSets and the desired state of pods                |
+| **Pod Replacement**     | Automatically replaces failed pods                     | Handles pod replacement via underlying ReplicaSets               |
+| **Updates & Rollbacks** | Not supported                                          | Supports **rolling updates** and **rollbacks**                   |
+| **Version Management**  | Manages pods of a single version                       | Can manage multiple ReplicaSets for different app versions       |
+| **Complexity**          | Simple, low-level controller                           | Higher-level abstraction with more features                      |
+| **Use Case**            | Maintain pod count                                     | Easier scaling, updates, and management for production workloads |
+
+---
+
+## Services
+- To connect pods internally or externally
+- Allows loose coupling between application components
+- Services use *labels* to select the correct pods
+- Operates at Layer 3 (Network) of OSI model
+
+**Types of Services**
+- **ClusterIP (default)** 
+  - Provides an internal IP for communication within the cluster only
+  - Not accessible externally -> secure by default
+  - Ideal for internal services like backend or database Pods
+
+- **NodePort**
+  - Opens a specific port on every node
+  - Maps external traffic to internal Pod target port
+  - Port range: 30000-32767
+  - Useful for simple external access or local testing
+
+- **Load Balancer**
+  - Creates an external cloud load balancer
+  - Distributes traffic across Pods automatically
+  - Needed for production external access in cloud environments
+  - Works with AWS, Azure, GCP
+
+*ClusterIP -> internal only, NodePort -> external via nde port, Load Balancer -> full external cloud exposure.*
+
+---
