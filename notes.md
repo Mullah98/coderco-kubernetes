@@ -249,4 +249,112 @@ kubectl apply -f nginx-deployment.yaml
 
 *ClusterIP -> internal only, NodePort -> external via nde port, Load Balancer -> full external cloud exposure.*
 
+- **ClusterIP service example:**
+```
+apiVersion: v1          # Kubernetes API version for core resources
+kind: Service           # This is a Service resource
+metadata:
+  name: nginx-svc-standard-service  # How to reference this service
+spec:
+  selector:
+    app: nginx          # Selects pods with label app=nginx
+  ports:
+    - protocol: TCP     # TCP traffic
+      port: 80          # Service port inside cluster
+      targetPort: 80    # Pod container port to route traffic to
+  type: ClusterIP       # Internal-only service
+```
+
+**Key commands:**
+- `kubectl get svc` -> Check services
+- `kubectl port-forward svc/nginx-svc-standard-service 8080:80` -> Maps port 8080 on your local machien to port 80 of the ClusterIP service inside cluster. Allows you to open `http://localhost:8080 in your browser`
+
+---
+
+## Storage
+- Pods are *ephemeral* -> data is lost when Pods restart or die
+- Persistent storage keeps data independant of Pod lifecycle
+
+**Persistent Volume (PV)**
+- A pre-provisioned storage source in the cluster
+- Abstracts storage details (EBS, NFS, disks, cloud storage)
+- Created and managed by cluster administrators
+
+**Persistent Volume Claim (PVC)**
+- A request for storage made by an application
+- Specifies storage size and access requirements
+- K8s binds PVC to a matching PV
+- Acts as the bridge between Pods and storage
+
+**Key relationships**
+- Pod -> Uses PVC
+- PVC -> Binds to PV
+- PV -> Represents actual storage
+
+---
+
+## Config Management
+
+**Config Maps**
+- Store non-confidential configuration data for pods
+- Used for environement variables, URLs, file paths
+- Provide dynamic deployments and flexibility
+
+**Create a ConfigMap:**
+```
+kubectl create configmap my-config --from-literal=APP_COLOUR=green --from-literal=APP_MODE=production
+```
+
+**Example of Pod yaml file:**
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: configmap-demo
+spec:
+  containers:
+    - name: demo
+      image: busybox:1.36
+      # Keep pod running
+      command: ["sh", "-c", "sleep 3600"]
+
+      # Environment variables from ConfigMap
+      env:
+        - name: APP_COLOUR
+          valueFrom:
+            configMapKeyRef:
+              name: my-config
+              key: APP_COLOUR
+        - name: APP_MODE
+          valueFrom:
+            configMapKeyRef:
+              name: my-config
+              key: APP_MODE
+
+      # Mount ConfigMap as files
+      volumeMounts:
+        - name: config-volume
+          mountPath: /etc/config
+
+  # Define ConfigMap volume
+  volumes:
+    - name: config-volume
+      configMap:
+        name: my-config
+```
+
+**Secrets**
+- Store sensitive data securely (e.g., passwords, API keys, tokens).
+- Encoded in **Base64** (not fully encrypted by default)
+- Only accessible to pods or services that need them
+
+**Example:**
+```
+kubectl create secret generic my-secret --from-literal=username=myuser --from-literal=password=mypasssecret
+```
+
+**Usage:**
+  1. **Mounted as Volumes** – App reads the secret like a file
+  2. **Environment Variables** – App reads secret as environment variables
+
 ---
