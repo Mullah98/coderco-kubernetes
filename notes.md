@@ -133,7 +133,6 @@ kind delete cluster --name k8s-demo
 - Containers share **network namespace** (localhost) and must mount volumes explicitly.
 
 **Imperative pod:**
-
 ```bash
 kubectl run nginx --image=nginx
 kubectl get pods -w
@@ -160,6 +159,12 @@ spec:
 ```bash
 kubectl apply -f nginx-pod.yaml
 ```
+
+**Delete a pod:** `kubectl delete pod <pod-name>`
+**Delete all pods:** `kubectl delete --all pods`
+
+**Access the Pod shell**
+- `kubectl exec -it <pod-name> -- /bin/sh`
 
 ---
 
@@ -203,6 +208,9 @@ spec:
 ```bash
 kubectl apply -f nginx-deployment.yaml
 ```
+
+**Delete a deployment:** `kubectl delete deployment <deployment-name>`
+**Delete all deployments:** `kubectl delete --all deployments`
 
 **Tips:**
 - `kubectl get pods -o wide` → see node placement.
@@ -356,5 +364,81 @@ kubectl create secret generic my-secret --from-literal=username=myuser --from-li
 **Usage:**
   1. **Mounted as Volumes** – App reads the secret like a file
   2. **Environment Variables** – App reads secret as environment variables
+
+**Create a secret**
+`kubectl create secret generic mysecret --from-literal=username=myuser --from-literal=password=mypassword`
+
+**View a secret**
+- `kubectl get secrets`
+- `kubectl get secret mysecret -o yaml`
+- Values are **base64 enncoded*. To decode and view:
+  - `echo <base64-value> | base64 --decode`
+
+**Use secret as an environment variable and mount as a volume**
+```
+env:
+- name: SECRET_USERNAME
+  valueFrom:
+    secretKeyRef:
+      name: mysecret
+      key: username
+- name: SECRET_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: mysecret
+      key: password
+volumeMounts:
+- name: secret-volume
+  mountPath: /etc/secret-volume
+  readOnly: true
+
+volumes:
+- name: secret-volume
+  secret:
+    secretName: mysecret ## Must match secretKeyRef.name
+```
+---
+
+Here’s a cleaner, more **digestible summary** of your notes. I’ve kept all essential points and removed redundancies while grouping related ideas.
+
+---
+
+## **Kubernetes Networking & Access Control**
+**Pod-to-Pod Communication**
+- Each pod gets a **unique IP** and can talk directly to other pods.
+- Flat network: All pods and nodes communicate directly; IPs are consistent across the cluster.
+- **Network Policies** (optional):
+  - Restrict or allow traffic between pods
+  - Use **labels** to target specific pods
+  - Types:
+    - **Ingress** → incoming traffic to pods
+    - **Egress** → outgoing traffic from pods
+  - Default: pods can communicate freely unless restricted
+
+**Node-to-Pod Communication**
+- Any node can reach any pod without NAT or extra setup.
+
+**Kubernetes DNS & Service Access**
+- Services are reachable by name via **internal DNS**:
+  - Short name: `nginx`
+  - FQDN: `nginx.default.svc.cluster.local`
+- `/etc/resolv.conf` shows the CoreDNS server used by pods
+- Benefits:
+  - Stable endpoints even if pods change
+  - Simplifies pod-to-pod communication
+  - Useful for debugging network issues
+- Debug pods (e.g., `netshoot`) can test connectivity and DNS resolution
+
+**Ingress Controllers**
+- Manage external access to services (like a smart router)
+- Components:
+  - **Ingress Resource** → defines routing rules (URLs/domains → services)
+  - **Ingress Controller** → enforces rules (e.g., Nginx, Traefik)
+
+- **Workflow:**
+  1. Define rules
+  2. Deploy controller
+  3. Controller routes traffic
+- Benefits: Centralized, secure, simplified traffic management
 
 ---
